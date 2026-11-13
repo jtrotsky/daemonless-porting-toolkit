@@ -155,6 +155,19 @@ dbuild generate --registry ghcr.io/daemonless      # or: export DBUILD_REGISTRY=
 Precedence: `--registry` / `DBUILD_REGISTRY` env → org from `origin` → fallback `ghcr.io/daemonless`.
 Then restore any stray `README.md` to upstream before committing — only `Containerfile` + `.j2` + `patches/` belong in the PR.
 
+**The image NAME has the same trap, and no flag.** `dbuild` takes the image name from the clone's
+**directory name** (`config.py:_detect_image_name` = `base.name.lower()`). A fork cloned as
+`sparky-fitness-daemonless` builds `ghcr.io/<you>/sparky-fitness-daemonless:build`, while the
+repo's `.daemonless/compose.yaml` runs `ghcr.io/daemonless/sparkyfitness:build`, so CIT fails with
+`Trying to pull ghcr.io/daemonless/sparkyfitness:build... manifest unknown` and
+`no container with name or ID "<project>_sparkyfitness_1"`. The README rewrite gets the
+project/bundle names wrong for the same reason.
+**Fix:** clone each upstream image repo into a directory named exactly after the upstream repo
+(`git clone <fork> sparkyfitness`), and export `DBUILD_REGISTRY=ghcr.io/daemonless`. If the
+clone already has the wrong name, the local stopgap is
+`doas podman tag <built>:build-latest ghcr.io/daemonless/<repo>:build` before `dbuild test`.
+(2026-11-03, sparkyfitness volume-path fix.)
+
 ### Build hangs for 10+ min AFTER the `RUN` finishes — `storage-applyLayer` pegged at 100% CPU
 **Signature:** the last build output is the end of a `RUN` (e.g. `pkg clean` done), then minutes of silence; `ps` shows `storage-applyLayer .../zfs/graph/<hash> (podman)` in **R** state burning CPU, `podman ps` goes sluggish.
 **Cause:** podman's **ZFS storage driver** commits a layer by unpacking it file-by-file into a per-layer ZFS dataset. A `node_modules`-heavy layer (node + npm + a JS app = thousands of tiny files) makes this O(files) commit grind for 10+ min. It's CPU-bound (R), not stuck (D), and not a disk-space issue.
@@ -183,6 +196,23 @@ cit:
 ```
 (or have the s6 `run` script echo a line containing `listening on`).
 **Why:** the ready gate is log-regex-based; an unmatched pattern silently degrades to a fixed sleep on every test run.
+
+### CIT "passes" against a LIVE instance of the same app — `Port ready after 0.0s`
+**Signature:** CIT reports `[ok] passed`, with `Port ready after 0.0s` and `Health ready after
+0.0s` straight after `podman-compose up`, and the screenshot matches the baseline. The test
+container itself may have failed to start.
+**Cause:** the CIT compose uses `network_mode: host`, and the build host already runs that app
+on the same ports (a production instance of the app being ported). The test container cannot
+bind them, and CIT's port, health and screenshot probes reach `127.0.0.1:<port>`, which is
+the production instance. A login page matches the baseline whether or not the new image works.
+The DB sidecar usually gets its own port (`POSTGRES_PORT: "5434"`), so nothing looks broken.
+**Fix:** before CIT, check that nothing is listening on the test ports:
+`sockstat -46l | grep -E ':(<port1>|<port2>)[[:space:]]'` must be empty. Stop the live instance
+(app container only) for the test, or run CIT on another host. Treat any `ready after 0.0s` as
+suspect. Invalidate a `.cit-passed` written by such a run, because it gates `git push`.
+**Why:** host networking has no per-container port namespace, so "the port answered" proves
+only that *something* answered. (Seen in practice: a CIT passed against a live instance and
+wrote `.cit-passed`. The 0.0s timings gave it away.)
 
 ### Container gets `UND_ERR_CONNECT_TIMEOUT` reaching the host or a sibling container
 **Signature:** app logs `TypeError: fetch failed … ConnectTimeoutError (attempted address: 10.88.0.1:<port>)` (or a sibling container's `10.88.0.x`), while host→container curl works fine.
