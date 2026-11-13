@@ -1,8 +1,13 @@
 # daemonless porting toolkit
 
-Claude Code skills, subagents, hooks and shell scripts that drive the port of an upstream app to a native FreeBSD OCI image for [daemonless](https://github.com/daemonless).
+> [!IMPORTANT]
+> **Use [daemonless/porting-toolkit](https://github.com/daemonless/porting-toolkit) instead.**
+> This repo is the original, Claude Code only version and is no longer maintained. The
+> daemonless copy works with any agent, has a larger cookbook (39 entries against 27 here),
+> a BSD 2-Clause licence, and follows the current daemonless AI policy. It was merged on
+> 5 November 2026 ([PR #1](https://github.com/daemonless/porting-toolkit/pull/1)).
 
-> **This is the original, Claude Code only version.** An agent-neutral rewrite was merged into the daemonless organisation as [daemonless/porting-toolkit](https://github.com/daemonless/porting-toolkit) ([PR #1](https://github.com/daemonless/porting-toolkit/pull/1), 5 November 2026). Use that one for new ports. It has a larger cookbook (39 entries against 27 here), a BSD 2-Clause licence, and it follows the current daemonless AI policy more closely. This repo stays up as the record of how the workflow started.
+Claude Code skills, subagents, hooks and shell scripts that drive the port of an upstream app to a native FreeBSD OCI image for [daemonless](https://github.com/daemonless). It stays up as the record of how the workflow started.
 
 ## Who it is for
 
